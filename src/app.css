@@ -193,22 +193,50 @@ button {
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg-color: #2d2d2d;
-    --text-color: #fff;
-    --secondary-text: #aaa;
-    --border-color: #444;
-    --shadow-color: rgba(0, 0, 0, 0.3);
+    --bg-color: #0a0a0a;
+    --text-color: #ffffff;
+    --secondary-text: #cccccc;
+    --border-color: #333333;
+    --shadow-color: rgba(0, 0, 0, 0.5);
+  }
+  
+  body {
+    background-color: #0a0a0a;
+  }
+  
+  .container {
+    background-color: #0a0a0a;
+  }
+  
+  .mode-selector {
+    background-color: rgba(255, 255, 255, 0.05);
   }
   
   .mode-btn.active {
-    background-color: #3a3a3a;
+    background-color: #1a1a1a;
+    color: var(--primary-color);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
   }
   
   .secondary-btn {
-    background-color: rgba(255, 255, 255, 0.1);
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
   }
   
   .secondary-btn:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+  }
+  
+  .primary-btn:hover {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+  }
+  
+  .rewards-toggle {
+    background-color: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+  }
+  
+  .rewards-toggle:hover {
     background-color: rgba(255, 255, 255, 0.2);
   }
 }

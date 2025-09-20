@@ -35,18 +35,12 @@
   let lastDiscoveryProgress = 0;
   
   // Watch for prop changes - calculate planets based on current session progress
-  $: if (currentSessionProgress !== undefined && currentMode === 'pomodoro' && !showReward) {
-    updateCurrentSessionRewards(currentSessionProgress);
-  }
-  
-  // Show all planets when Space Explorer is opened
-  $: if (showReward) {
-    currentPlanetsDiscovered = 9;
-  } else {
-    // Reset to actual progress when hidden
-    if (currentMode === 'pomodoro') {
+  $: if (currentSessionProgress !== undefined) {
+    if (currentMode === 'pomodoro' && showReward) {
       updateCurrentSessionRewards(currentSessionProgress);
-    } else {
+    } else if (currentMode === 'pomodoro' && !showReward) {
+      updateCurrentSessionRewards(currentSessionProgress);
+    } else if (currentMode !== 'pomodoro') {
       currentPlanetsDiscovered = 0;
     }
   }
@@ -77,6 +71,9 @@
       }
     } else if (planetsDiscovered < currentPlanetsDiscovered) {
       // Session reset - reset planets
+      currentPlanetsDiscovered = planetsDiscovered;
+    } else if (showReward) {
+      // When Space Explorer is opened, set to current calculated value
       currentPlanetsDiscovered = planetsDiscovered;
     }
   }

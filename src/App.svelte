@@ -91,7 +91,7 @@
         
         // Create new window
         const webview = new WebviewWindow('space-explorer', {
-          url: 'space-explorer.html',
+          url: `space-explorer.html?progress=${currentSessionProgress}&mode=${currentMode}`,
           title: 'Space Explorer',
           width: 1000,
           height: 700,
@@ -102,7 +102,10 @@
           fullscreen: true
         });
         
-        console.log('Space Explorer window created');
+        console.log('Space Explorer window created with URL:', `space-explorer.html?progress=${currentSessionProgress}&mode=${currentMode}`);
+        
+        // Send initial progress update after window is created
+        setTimeout(() => sendProgressUpdateToSpaceExplorer(), 1000);
       } else {
         console.log('Tauri not available, space explorer requires desktop app');
         // Fallback: show inline space rewards
@@ -174,7 +177,33 @@
   
   // Handle timer progress updates
   function handleTimerProgress(event) {
-    currentSessionProgress = event.detail.progress;
+    const newProgress = event.detail.progress;
+    console.log('Main app progress update:', newProgress, 'current mode:', currentMode);
+    currentSessionProgress = newProgress;
+    
+    // Send progress update to Space Explorer window if it's open
+    sendProgressUpdateToSpaceExplorer();
+  }
+
+  // Send progress update to Space Explorer window
+  async function sendProgressUpdateToSpaceExplorer() {
+    if (!isTauri()) return;
+    
+    try {
+      const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+      const spaceExplorerWindow = await WebviewWindow.getByLabel('space-explorer');
+      if (spaceExplorerWindow) {
+        console.log('Sending progress update to Space Explorer:', currentSessionProgress, currentMode);
+        await spaceExplorerWindow.emit('progress-update', { 
+          progress: currentSessionProgress, 
+          mode: currentMode 
+        });
+      } else {
+        console.log('Space Explorer window not found');
+      }
+    } catch (error) {
+      console.log('Error sending progress update:', error);
+    }
   }
   
   // Tauri window controls

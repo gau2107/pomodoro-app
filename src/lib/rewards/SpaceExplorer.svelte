@@ -6,6 +6,11 @@
   // For Tauri window management
   let appWindow;
 
+  // Planet discovery state
+  let currentPlanetsDiscovered = 0;
+  let currentSessionProgress = 100;
+  let currentMode = 'pomodoro';
+
   // Initialize Tauri window on mount
   onMount(async () => {
     try {
@@ -15,13 +20,66 @@
         const { Window } = await import('@tauri-apps/api/window');
         appWindow = Window.getCurrent();
         console.log("Space Explorer Window initialized");
+        
+        // Listen for progress updates from main window
+        appWindow.listen('progress-update', (event) => {
+          const { progress, mode } = event.payload;
+          console.log('Space Explorer received progress update:', progress, 'mode:', mode);
+          currentSessionProgress = progress;
+          currentMode = mode;
+          updateDiscoveredPlanets(progress);
+        });
       } else {
         console.log("Running in web environment");
       }
     } catch (error) {
       console.error("Failed to initialize Space Explorer Window:", error);
     }
+
+    // Read URL parameters for initial progress and mode
+    const urlParams = new URLSearchParams(window.location.search);
+    currentSessionProgress = parseFloat(urlParams.get('progress')) || 100;
+    currentMode = urlParams.get('mode') || 'pomodoro';
+    
+    console.log('Space Explorer URL params - progress:', urlParams.get('progress'), 'mode:', urlParams.get('mode'));
+    console.log('Space Explorer initialized with progress:', currentSessionProgress, 'mode:', currentMode);
+    
+    // Calculate discovered planets based on initial progress
+    updateDiscoveredPlanets(currentSessionProgress);
   });
+
+  // Calculate how many planets should be discovered based on progress
+  function updateDiscoveredPlanets(progressPercent) {
+    console.log('updateDiscoveredPlanets called with:', progressPercent, 'currentMode:', currentMode);
+    
+    if (currentMode !== 'pomodoro') {
+      currentPlanetsDiscovered = 0;
+      console.log('Not in pomodoro mode, setting planets to 0');
+      return;
+    }
+    
+    // For a 45-minute session, divide into 9 planets (every 11.11% progress = every 5 minutes)
+    const planetsForSession = 9;
+    const progressPerPlanet = 100 / planetsForSession;
+    
+    // Calculate how many planets should be discovered based on progress
+    const timeElapsedPercent = 100 - progressPercent; // Invert because progress goes from 100 to 0
+    const planetsDiscovered = Math.floor(timeElapsedPercent / progressPerPlanet);
+    
+    console.log('Calculation details:');
+    console.log('- progressPercent:', progressPercent);
+    console.log('- timeElapsedPercent:', timeElapsedPercent);
+    console.log('- progressPerPlanet:', progressPerPlanet);
+    console.log('- planetsDiscovered:', planetsDiscovered);
+    
+    currentPlanetsDiscovered = planetsDiscovered;
+    console.log('Set currentPlanetsDiscovered to:', planetsDiscovered);
+  }
+
+  // Reactive statement to update planets when mode changes
+  $: if (currentMode !== 'pomodoro') {
+    currentPlanetsDiscovered = 0;
+  }
 
   // Window control functions
   async function minimizeApp() {
@@ -166,13 +224,15 @@
     <div class="sun-corona"></div>
   </div>
 
-  <!-- Orbital Paths -->
-  {#each planetData as planet, i}
+  <!-- Orbital Paths - only show for discovered planets -->
+  {#each Array(currentPlanetsDiscovered) as _, i}
+    {@const planet = planetData[i]}
     <div class="orbit-path" style="width: {planet.orbitRadius * 2}vh; height: {planet.orbitRadius * 2}vh;"></div>
   {/each}
 
-  <!-- Planets -->
-  {#each planetData as planet, i}
+  <!-- Planets - only show discovered planets -->
+  {#each Array(currentPlanetsDiscovered) as _, i}
+    {@const planet = planetData[i]}
     <div
       class={`planet planet-${i} planet-${planet.name.toLowerCase()}`}
       style="
