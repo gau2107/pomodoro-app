@@ -3,7 +3,7 @@
   import PomodoroTimer from './lib/PomodoroTimer.svelte';
   import soundManager from './lib/utils/sounds.js';
   import SpaceRewards from './lib/rewards/SpaceRewards.svelte';
-  import { isTauri, minimizeWindow, closeWindow } from './lib/tauriApi.js';
+  import { isTauri } from './lib/tauriApi.js';
   
   // For Tauri window management
   let appWindow;
@@ -26,18 +26,7 @@
     }
   });
   
-  // Window control functions
-  async function minimizeApp() {
-    console.log("Minimize button clicked in App.svelte");
-    soundManager.play('click');
-    await minimizeWindow();
-  }
-
-  async function closeApp() {
-    console.log("Close button clicked in App.svelte");
-    soundManager.play('click');
-    await closeWindow();
-  }
+  // Window control functions (removed - using native controls)
   
   // Timer modes
   const POMODORO = 'pomodoro';
@@ -84,8 +73,14 @@
         try {
           const existingWindow = await WebviewWindow.getByLabel('space-explorer');
           if (existingWindow) {
-            // If window exists, just show and focus it
+            // If window exists, show, attempt to set fullscreen and focus it
             await existingWindow.show();
+            try {
+              // some WebviewWindow implementations expose setFullscreen
+              await existingWindow.setFullscreen(true);
+            } catch (fsErr) {
+              // ignore if method isn't available
+            }
             await existingWindow.setFocus();
             console.log('Space Explorer window shown');
             return;
@@ -103,7 +98,8 @@
           center: true,
           resizable: true,
           decorations: true,
-          visible: true
+          visible: true,
+          fullscreen: true
         });
         
         console.log('Space Explorer window created');
@@ -195,22 +191,6 @@
 
 <main>
   <div class="container">
-    <div class="window-controls">
-      <div class="title">Pomodoro Timer</div>
-      <div class="control-buttons">
-        <button class="window-btn minimize-btn" on:click={minimizeApp} title="Minimize" aria-label="Minimize window">
-          <svg width="12" height="1" viewBox="0 0 12 1" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <rect width="12" height="1" rx="0.5" fill="currentColor"/>
-          </svg>
-        </button>
-        <button class="window-btn close-btn" on:click={closeApp} title="Close" aria-label="Close window">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M1 1L11 11M1 11L11 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
-          </svg>
-        </button>
-      </div>
-    </div>
-    
     <div class="mode-selector">
       <button 
         class="mode-btn {currentMode === POMODORO ? 'active' : ''}" 
@@ -290,58 +270,10 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-  }
-  
-  /* Window controls styles */
-  .window-controls {
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 10px;
-    user-select: none;
     -webkit-app-region: drag;
-    box-sizing: border-box;
   }
   
-  .title {
-    font-size: 0.9rem;
-    font-weight: 500;
-    color: var(--secondary-text);
-  }
-  
-  .control-buttons {
-    display: flex;
-    gap: 8px;
-  }
-  
-  .window-btn {
-    -webkit-app-region: no-drag;
-    width: 32px;
-    height: 32px;
-    border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    border: none;
-    color: var(--secondary-text);
-    transition: all 0.15s ease;
-    background-color: rgba(0, 0, 0, 0.03);
-    padding: 0;
-    position: relative;
-    z-index: 1000;
-  }
-  
-  .minimize-btn:hover {
-    background-color: rgba(0, 0, 0, 0.1);
-    transform: translateY(1px);
-  }
-  
-  .close-btn:hover {
-    background-color: #ff3b30;
-    color: white;
-  }
+  /* Window controls styles (removed - using native controls) */
   
   .mode-selector {
     margin: 15px 0;

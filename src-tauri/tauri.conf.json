@@ -14,10 +14,10 @@
     "windows": [
       {
         "title": "Pomodoro",
-        "width": 450,
-        "height": 650,
+        "width": 350,
+        "height": 550,
         "resizable": false,
-        "decorations": false,
+        "decorations": true,
         "fullscreen": false,
         "center": true,
         "visible": true,
@@ -28,8 +28,7 @@
         "label": "space-explorer",
         "title": "Space Explorer",
         "url": "space-explorer.html",
-        "width": 1000,
-        "height": 700,
+        "fullscreen": true,
         "resizable": true,
         "center": true,
         "visible": false,
