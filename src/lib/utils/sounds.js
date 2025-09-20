@@ -22,20 +22,39 @@ export class SoundManager {
   
   // Initialize a sound with given volume
   initSound(name, src, volume = 1.0) {
-    const audio = new Audio(src);
-    audio.volume = volume;
-    this.sounds[name] = audio;
+    try {
+      const audio = new Audio();
+      audio.volume = volume;
+      audio.preload = 'auto';
+      
+      // Set source after creating audio element
+      audio.src = src;
+      
+      this.sounds[name] = audio;
+    } catch (error) {
+      console.warn(`Failed to initialize sound '${name}':`, error);
+      // Create a dummy audio element to prevent further errors
+      this.sounds[name] = { play: () => {}, volume: 0 };
+    }
   }
   
   // Play a sound by name
   play(name) {
     if (this.muted || !this.sounds[name]) return;
     
-    // Create a new audio element each time to allow overlapping sounds
-    const sound = this.sounds[name];
-    const clone = sound.cloneNode();
-    clone.volume = sound.volume;
-    clone.play();
+    try {
+      // Create a new audio element each time to allow overlapping sounds
+      const sound = this.sounds[name];
+      if (sound && typeof sound.cloneNode === 'function') {
+        const clone = sound.cloneNode();
+        clone.volume = sound.volume;
+        clone.play().catch(error => {
+          console.warn(`Failed to play sound '${name}':`, error);
+        });
+      }
+    } catch (error) {
+      console.warn(`Error playing sound '${name}':`, error);
+    }
   }
   
   // Toggle mute state

@@ -10,16 +10,30 @@
   "beforeBuildCommand": "npm run build"
 },
   "app": {
+    "withGlobalTauri": true,
     "windows": [
       {
         "title": "Pomodoro",
-        "width": 320,
-        "height": 600,
+        "width": 450,
+        "height": 650,
         "resizable": false,
         "decorations": false,
         "fullscreen": false,
         "center": true,
-        "visible": true
+        "visible": true,
+        "focus": true,
+        "skipTaskbar": false
+      },
+      {
+        "label": "space-explorer",
+        "title": "Space Explorer",
+        "url": "space-explorer.html",
+        "width": 1000,
+        "height": 700,
+        "resizable": true,
+        "center": true,
+        "visible": false,
+        "create": false
       }
     ],
     "security": {

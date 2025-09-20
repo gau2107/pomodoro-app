@@ -1,14 +1,27 @@
 <script>
   import { onMount, createEventDispatcher } from 'svelte';
-  import { spaceRewards } from './spaceRewardsStore.js';
   import soundManager from '../utils/sounds.js';
   
   // Props: These define how quickly rewards are earned
-  export let focusSessionsCompleted = 0;
+  export let currentSessionProgress = 100; // 100% at start, 0% at end
+  export let currentMode = 'pomodoro'; // 'pomodoro' or 'shortBreak'
   export let showReward = false;
   
   // Event dispatcher for animations
   const dispatch = createEventDispatcher();
+  
+  // Planet data with visual properties
+  const planetData = [
+    { name: 'Mercury', color: '#8C7853', size: 16, orbitRadius: 60, speed: 4 },
+    { name: 'Venus', color: '#FFC649', size: 20, orbitRadius: 90, speed: 3 },
+    { name: 'Earth', color: '#6B93D6', size: 22, orbitRadius: 120, speed: 2 },
+    { name: 'Mars', color: '#CD5C5C', size: 18, orbitRadius: 150, speed: 1.6 },
+    { name: 'Jupiter', color: '#D8CA9D', size: 32, orbitRadius: 200, speed: 1.2 },
+    { name: 'Saturn', color: '#FAD5A5', size: 28, orbitRadius: 250, speed: 1 },
+    { name: 'Uranus', color: '#4FD0E7', size: 24, orbitRadius: 300, speed: 0.8 },
+    { name: 'Neptune', color: '#4B70DD', size: 24, orbitRadius: 350, speed: 0.6 },
+    { name: 'Pluto', color: '#E5E5E5', size: 14, orbitRadius: 400, speed: 0.4 }
+  ];
   
   // References for animations
   let spaceContainer;
@@ -18,36 +31,54 @@
   // Animation states
   let isAnimating = false;
   let animationStage = 'idle'; // 'idle', 'flying', 'discovering', 'celebrating'
+  let currentPlanetsDiscovered = 0;
+  let lastDiscoveryProgress = 0;
   
-  // Watch for prop changes
-  $: if (focusSessionsCompleted > 0) {
-    updateRewards(focusSessionsCompleted);
+  // Watch for prop changes - calculate planets based on current session progress
+  $: if (currentSessionProgress !== undefined && currentMode === 'pomodoro' && !showReward) {
+    updateCurrentSessionRewards(currentSessionProgress);
   }
   
-  // Update the rewards based on completed sessions
-  function updateRewards(sessionsCount) {
-    // Update the store
-    spaceRewards.update(rewards => {
-      // Calculate new discoveries
-      const newPlanetsToDiscover = Math.floor(sessionsCount / 3) - Math.floor(rewards.sessionsCompleted / 3);
+  // Show all planets when Space Explorer is opened
+  $: if (showReward) {
+    currentPlanetsDiscovered = 9;
+  } else {
+    // Reset to actual progress when hidden
+    if (currentMode === 'pomodoro') {
+      updateCurrentSessionRewards(currentSessionProgress);
+    } else {
+      currentPlanetsDiscovered = 0;
+    }
+  }
+  
+  // Update rewards based on current session progress (only for focus sessions)
+  function updateCurrentSessionRewards(progressPercent) {
+    if (currentMode !== 'pomodoro') {
+      currentPlanetsDiscovered = 0;
+      return;
+    }
+    
+    // For a 45-minute session, divide into 9 planets (every 11.11% progress = every 5 minutes)
+    const planetsForSession = 9;
+    const progressPerPlanet = 100 / planetsForSession;
+    
+    // Calculate how many planets should be discovered based on progress
+    const timeElapsedPercent = 100 - progressPercent; // Invert because progress goes from 100 to 0
+    const planetsDiscovered = Math.floor(timeElapsedPercent / progressPerPlanet);
+    
+    // Check if we just discovered a new planet
+    if (planetsDiscovered > currentPlanetsDiscovered && planetsDiscovered > 0) {
+      // We discovered a new planet!
+      currentPlanetsDiscovered = planetsDiscovered;
       
-      // Calculate progress towards next discovery (0-100%)
-      const nextDiscoveryProgress = ((sessionsCount % 3) / 3) * 100;
-      
-      // If there's a new discovery and we're showing rewards, trigger animation
-      if (newPlanetsToDiscover > 0 && showReward && !isAnimating) {
+      // Trigger discovery animation if showing rewards
+      if (showReward && !isAnimating) {
         setTimeout(() => triggerDiscoveryAnimation(), 500);
       }
-      
-      // Update the store
-      return {
-        ...rewards,
-        sessionsCompleted: sessionsCount,
-        planetsDiscovered: rewards.planetsDiscovered + (newPlanetsToDiscover > 0 ? newPlanetsToDiscover : 0),
-        nextDiscoveryProgress: nextDiscoveryProgress,
-        hasNewDiscovery: newPlanetsToDiscover > 0
-      };
-    });
+    } else if (planetsDiscovered < currentPlanetsDiscovered) {
+      // Session reset - reset planets
+      currentPlanetsDiscovered = planetsDiscovered;
+    }
   }
   
   // Trigger the planet discovery animation
@@ -70,9 +101,6 @@
         setTimeout(() => {
           animationStage = 'idle';
           isAnimating = false;
-          
-          // Clear the new discovery flag
-          spaceRewards.update(r => ({...r, hasNewDiscovery: false}));
           
           // Notify parent component
           dispatch('discoveryComplete');
@@ -106,30 +134,27 @@
       <div class="sun"></div>
       
       <!-- Orbits and Planets -->
-      {#each Array($spaceRewards.planetsDiscovered) as _, i}
-        {@const planetStyle = getPlanetStyle(i)}
+      {#each Array(currentPlanetsDiscovered) as _, i}
+        {@const planet = planetData[i]}
         
         <div 
           class="orbit" 
-          style="width: {planetStyle.orbitDistance * 2}px; height: {planetStyle.orbitDistance * 2}px;">
+          style="width: {planet.orbitRadius * 2}px; height: {planet.orbitRadius * 2}px;">
           
           <div 
             class="planet" 
             style="
-              background-color: {planetStyle.color}; 
-              width: {planetStyle.size}; 
-              height: {planetStyle.size};
-              animation-delay: {-i * 5}s;"
-            class:has-rings={planetStyle.hasRings}
-            class:has-moons={planetStyle.hasMoons}>
+              background-color: {planet.color}; 
+              width: {planet.size}px; 
+              height: {planet.size}px;
+              animation-delay: {-i * 5}s;
+              --orbit-speed: {planet.speed}s;
+              --orbit-radius: {planet.orbitRadius}px;"
+          >
+            <span class="planet-name">{planet.name}</span>
             
-            {#if planetStyle.hasRings}
+            {#if planet.name === 'Saturn'}
               <div class="rings"></div>
-            {/if}
-            
-            {#if planetStyle.hasMoons}
-              <div class="moon moon-1"></div>
-              <div class="moon moon-2"></div>
             {/if}
           </div>
         </div>
@@ -151,24 +176,24 @@
         </svg>
       </div>
       
-      <!-- Progress indicator for next discovery -->
+      <!-- Progress indicator for current session -->
       <div class="discovery-progress">
-        <div class="label">Next discovery</div>
+        <div class="label">Session Progress</div>
         <div class="progress-bar">
-          <div class="progress-fill" style="width: {$spaceRewards.nextDiscoveryProgress}%"></div>
+          <div class="progress-fill" style="width: {100 - currentSessionProgress}%"></div>
         </div>
-        <div class="progress-text">{Math.floor($spaceRewards.nextDiscoveryProgress)}%</div>
+        <div class="progress-text">{Math.floor(100 - currentSessionProgress)}%</div>
       </div>
       
       <!-- Stats display -->
       <div class="stats">
         <div class="stat">
-          <span class="value">{$spaceRewards.planetsDiscovered}</span>
-          <span class="label">Planets Discovered</span>
+          <span class="value">{currentPlanetsDiscovered}</span>
+          <span class="label">Planets This Session</span>
         </div>
         <div class="stat">
-          <span class="value">{$spaceRewards.sessionsCompleted}</span>
-          <span class="label">Focus Sessions</span>
+          <span class="value">{Math.floor((100 - currentSessionProgress) / (100/9)) + 1}</span>
+          <span class="label">Next Planet In</span>
         </div>
       </div>
     </div>
@@ -176,7 +201,7 @@
     <!-- Collapsed view shows just a small indicator -->
     <div class="collapsed-indicator">
       <div class="planet-icon"></div>
-      <div class="planet-count">{$spaceRewards.planetsDiscovered}</div>
+      <div class="planet-count">{currentPlanetsDiscovered}</div>
     </div>
   {/if}
 </div>
@@ -188,7 +213,7 @@
   }
   
   .expanded {
-    height: 300px;
+    height: 500px;
     margin: 20px 0;
   }
   
@@ -199,7 +224,7 @@
   
   .cosmos-container {
     position: relative;
-    width: 100%;
+    width: 100vw;
     height: 100%;
     background-color: rgba(10, 10, 25, 0.9);
     border-radius: 12px;
@@ -221,6 +246,9 @@
   
   .orbit {
     position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 50%;
     display: flex;
@@ -232,45 +260,33 @@
     position: absolute;
     border-radius: 50%;
     transform-origin: 50% 50%;
-    animation: orbit 20s linear infinite;
+    animation: orbit var(--orbit-speed) linear infinite;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
   }
   
-  .planet.has-rings {
-    position: relative;
+  .planet-name {
+    font-size: 10px;
+    font-weight: bold;
+    color: white;
+    text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.7);
+    white-space: nowrap;
+    pointer-events: none;
+    z-index: 1;
   }
   
-  .planet.has-rings .rings {
+  .rings {
     position: absolute;
-    width: 160%;
-    height: 40%;
-    background-color: rgba(255, 255, 255, 0.2);
-    border-radius: 50%;
-    top: 30%;
-    left: -30%;
-    transform: rotateX(75deg);
-  }
-  
-  .planet.has-moons {
-    position: relative;
-  }
-  
-  .planet .moon {
-    position: absolute;
-    width: 30%;
-    height: 30%;
-    background-color: rgba(200, 200, 200, 0.8);
-    border-radius: 50%;
-    animation: moonOrbit 10s linear infinite;
-  }
-  
-  .moon-1 {
-    animation-delay: -2s;
-  }
-  
-  .moon-2 {
-    width: 20%;
-    height: 20%;
-    animation-duration: 7s;
+    width: calc(100% * 1.8);
+    height: 4px;
+    background: rgba(250, 213, 165, 0.6);
+    border-radius: 2px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
   }
   
   .spaceship {
@@ -382,13 +398,8 @@
   
   /* Animations */
   @keyframes orbit {
-    from { transform: rotate(0deg) translateX(100px) rotate(0deg); }
-    to { transform: rotate(360deg) translateX(100px) rotate(-360deg); }
-  }
-  
-  @keyframes moonOrbit {
-    0% { transform: rotate(0deg) translate(150%) rotate(0deg); }
-    100% { transform: rotate(360deg) translate(150%) rotate(-360deg); }
+    from { transform: rotate(0deg) translateX(var(--orbit-radius)) rotate(0deg); }
+    to { transform: rotate(360deg) translateX(var(--orbit-radius)) rotate(-360deg); }
   }
   
   @keyframes flyIn {

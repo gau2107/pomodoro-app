@@ -3,6 +3,7 @@
   import PomodoroTimer from './lib/PomodoroTimer.svelte';
   import soundManager from './lib/utils/sounds.js';
   import SpaceRewards from './lib/rewards/SpaceRewards.svelte';
+  import { isTauri, minimizeWindow, closeWindow } from './lib/tauriApi.js';
   
   // For Tauri window management
   let appWindow;
@@ -10,12 +11,18 @@
   // Initialize Tauri window on mount
   onMount(async () => {
     try {
-      // Import Window API
-      const { Window } = await import('@tauri-apps/api/window');
-      appWindow = Window.getCurrent();
-      console.log("Tauri Window initialized in App.svelte");
+      // Check if we're running in Tauri environment
+      if (isTauri()) {
+        // Import Window API
+        const { Window } = await import('@tauri-apps/api/window');
+        appWindow = Window.getCurrent();
+        console.log("Tauri Window initialized in App.svelte");
+      } else {
+        console.log("Running in web environment, Tauri Window API not available");
+      }
     } catch (error) {
       console.error("Failed to initialize Tauri Window:", error);
+      console.log("Continuing without window controls - this is normal in web environment");
     }
   });
   
@@ -23,33 +30,13 @@
   async function minimizeApp() {
     console.log("Minimize button clicked in App.svelte");
     soundManager.play('click');
-    
-    try {
-      if (appWindow) {
-        console.log("Calling window.minimize()");
-        await appWindow.minimize();
-      } else {
-        console.error("Window object not available");
-      }
-    } catch (error) {
-      console.error("Failed to minimize window:", error);
-    }
+    await minimizeWindow();
   }
-  
+
   async function closeApp() {
     console.log("Close button clicked in App.svelte");
     soundManager.play('click');
-    
-    try {
-      if (appWindow) {
-        console.log("Calling window.close()");
-        await appWindow.close();
-      } else {
-        console.error("Window object not available");
-      }
-    } catch (error) {
-      console.error("Failed to close window:", error);
-    }
+    await closeWindow();
   }
   
   // Timer modes
@@ -66,6 +53,7 @@
   let currentMode = POMODORO;
   let pomodorosCompleted = 0;
   let timerRef;
+  let currentSessionProgress = 100; // 100% at start, 0% at end
   
   // Get current mode label
   $: modeLabel = currentMode === POMODORO 
@@ -84,16 +72,60 @@
     }
   }
   
-  // Toggle space rewards view
-  function toggleSpaceRewards() {
-    showSpaceRewards = !showSpaceRewards;
+  // Open space explorer in a new window
+  async function openSpaceExplorer() {
     soundManager.play('click');
+    
+    try {
+      if (isTauri()) {
+        const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+        
+        // Try to get existing window first
+        try {
+          const existingWindow = await WebviewWindow.getByLabel('space-explorer');
+          if (existingWindow) {
+            // If window exists, just show and focus it
+            await existingWindow.show();
+            await existingWindow.setFocus();
+            console.log('Space Explorer window shown');
+            return;
+          }
+        } catch (e) {
+          console.log('No existing window found, creating new one');
+        }
+        
+        // Create new window
+        const webview = new WebviewWindow('space-explorer', {
+          url: 'space-explorer.html',
+          title: 'Space Explorer',
+          width: 1000,
+          height: 700,
+          center: true,
+          resizable: true,
+          decorations: true,
+          visible: true
+        });
+        
+        console.log('Space Explorer window created');
+      } else {
+        console.log('Tauri not available, space explorer requires desktop app');
+        // Fallback: show inline space rewards
+        showSpaceRewards = !showSpaceRewards;
+      }
+    } catch (error) {
+      console.error('Failed to open Space Explorer window:', error);
+      // Fallback: show inline space rewards
+      showSpaceRewards = !showSpaceRewards;
+    }
   }
   
   // Switch between timer modes
   function switchMode(mode) {
     soundManager.play('click');
     currentMode = mode;
+    
+    // Reset session progress when switching modes
+    currentSessionProgress = 100;
     
     // Reset timer when mode changes
     if (timerRef) {
@@ -144,6 +176,11 @@
     soundManager.play('click');
   }
   
+  // Handle timer progress updates
+  function handleTimerProgress(event) {
+    currentSessionProgress = event.detail.progress;
+  }
+  
   // Tauri window controls
   // We'll use the window controls from our component
   // which handles the Tauri API calls internally
@@ -191,7 +228,8 @@
       bind:this={timerRef}
       duration={DURATIONS[currentMode]}
       label={modeLabel}
-      on:complete={handleTimerComplete}>
+      on:complete={handleTimerComplete}
+      on:progress={handleTimerProgress}>
       
       <div class="controls">
         {#if timerRef?.isRunning}
@@ -229,14 +267,15 @@
     <div class="settings">
       <span>Focus sessions: {pomodorosCompleted}</span>
       <span class="time-worked">{Math.floor(pomodorosCompleted * 45 / 60)} hrs {pomodorosCompleted * 45 % 60} mins of focused work</span>
-      <button class="rewards-toggle" on:click={toggleSpaceRewards}>
-        {showSpaceRewards ? 'Hide' : 'Show'} Space Explorer
+      <button class="rewards-toggle" on:click={openSpaceExplorer}>
+        Open Space Explorer
       </button>
     </div>
     
     <!-- Space Explorer Reward System -->
     <SpaceRewards 
-      focusSessionsCompleted={pomodorosCompleted} 
+      currentSessionProgress={currentSessionProgress} 
+      currentMode={currentMode}
       showReward={showSpaceRewards}
       on:discoveryComplete={() => soundManager.play('timerEnd')} 
     />

@@ -15,6 +15,8 @@
   let isRunning = false;
   let intervalId;
   let progressPercent = 100;
+  let startTime = 0; // Track when timer started
+  let pausedTime = 0; // Track total paused time
   
   // Format time as MM:SS
   export function formatTime(seconds) {
@@ -27,14 +29,22 @@
   export function startTimer() {
     if (!isRunning) {
       isRunning = true;
+      startTime = performance.now() - (pausedTime * 1000); // Account for previously paused time
+      
       intervalId = setInterval(() => {
-        if (timeRemaining > 0) {
-          timeRemaining--;
-          updateProgress();
-        } else {
-          completeTimer();
+        if (isRunning) {
+          const elapsed = (performance.now() - startTime) / 1000; // Convert to seconds
+          const remaining = Math.max(0, duration - elapsed);
+          
+          if (remaining > 0) {
+            timeRemaining = Math.ceil(remaining);
+            updateProgress();
+          } else {
+            timeRemaining = 0;
+            completeTimer();
+          }
         }
-      }, 1000);
+      }, 100); // Check more frequently for accuracy
       
       // Dispatch event
       dispatch('start');
@@ -44,12 +54,17 @@
   // Update progress bar
   function updateProgress() {
     progressPercent = (timeRemaining / duration) * 100;
+    
+    // Dispatch progress event
+    dispatch('progress', { progress: progressPercent });
   }
   
   // Pause the timer
   export function pauseTimer() {
     if (isRunning) {
       isRunning = false;
+      // Track how much time has elapsed when pausing
+      pausedTime = (performance.now() - startTime) / 1000;
       clearInterval(intervalId);
       
       // Dispatch event
@@ -62,6 +77,10 @@
     pauseTimer();
     timeRemaining = duration;
     updateProgress();
+    
+    // Reset tracking variables
+    startTime = 0;
+    pausedTime = 0;
     
     // Dispatch event
     dispatch('reset');
@@ -82,6 +101,9 @@
   $: if (duration && !isRunning) {
     timeRemaining = duration;
     updateProgress();
+    // Reset tracking variables when duration changes
+    startTime = 0;
+    pausedTime = 0;
   }
   
   // Auto-start if requested
