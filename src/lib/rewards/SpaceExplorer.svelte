@@ -19,18 +19,14 @@
         // Import Window API
         const { Window } = await import('@tauri-apps/api/window');
         appWindow = Window.getCurrent();
-        console.log("Space Explorer Window initialized");
         
         // Listen for progress updates from main window
         appWindow.listen('progress-update', (event) => {
           const { progress, mode } = event.payload;
-          console.log('Space Explorer received progress update:', progress, 'mode:', mode);
           currentSessionProgress = progress;
           currentMode = mode;
           updateDiscoveredPlanets(progress);
         });
-      } else {
-        console.log("Running in web environment");
       }
     } catch (error) {
       console.error("Failed to initialize Space Explorer Window:", error);
@@ -41,20 +37,14 @@
     currentSessionProgress = parseFloat(urlParams.get('progress')) || 100;
     currentMode = urlParams.get('mode') || 'pomodoro';
     
-    console.log('Space Explorer URL params - progress:', urlParams.get('progress'), 'mode:', urlParams.get('mode'));
-    console.log('Space Explorer initialized with progress:', currentSessionProgress, 'mode:', currentMode);
-    
     // Calculate discovered planets based on initial progress
     updateDiscoveredPlanets(currentSessionProgress);
   });
 
   // Calculate how many planets should be discovered based on progress
   function updateDiscoveredPlanets(progressPercent) {
-    console.log('updateDiscoveredPlanets called with:', progressPercent, 'currentMode:', currentMode);
-    
     if (currentMode !== 'pomodoro') {
       currentPlanetsDiscovered = 0;
-      console.log('Not in pomodoro mode, setting planets to 0');
       return;
     }
     
@@ -66,14 +56,7 @@
     const timeElapsedPercent = 100 - progressPercent; // Invert because progress goes from 100 to 0
     const planetsDiscovered = Math.floor(timeElapsedPercent / progressPerPlanet);
     
-    console.log('Calculation details:');
-    console.log('- progressPercent:', progressPercent);
-    console.log('- timeElapsedPercent:', timeElapsedPercent);
-    console.log('- progressPerPlanet:', progressPerPlanet);
-    console.log('- planetsDiscovered:', planetsDiscovered);
-    
     currentPlanetsDiscovered = planetsDiscovered;
-    console.log('Set currentPlanetsDiscovered to:', planetsDiscovered);
   }
 
   // Reactive statement to update planets when mode changes
@@ -188,33 +171,26 @@
 <main class="space-explorer">
   <!-- Enhanced cosmic background with shooting stars -->
   <div class="cosmic-background">
-    <!-- layered starfields for parallax -->
+    <!-- layered starfields for parallax - reduced for performance -->
     <div class="star-layer star-layer-1" aria-hidden="true">
-      {#each Array(60) as _, s}
+      {#each Array(20) as _, s}
         <span class="star s1 s-{s}" style="left: {Math.random() * 100}%; top: {Math.random() * 100}%; --size: {Math.random() * 2 + 0.6}px; --delay: {Math.random() * 6}s; --blink: {Math.random()};"></span>
       {/each}
     </div>
     <div class="star-layer star-layer-2" aria-hidden="true">
-      {#each Array(40) as _, s}
+      {#each Array(15) as _, s}
         <span class="star s2 s-{s}" style="left: {Math.random() * 100}%; top: {Math.random() * 100}%; --size: {Math.random() * 3 + 1}px; --delay: {Math.random() * 8}s; --blink: {Math.random()};"></span>
       {/each}
     </div>
-    <div class="star-layer star-layer-3" aria-hidden="true">
-      {#each Array(20) as _, s}
-        <span class="star s3 s-{s}" style="left: {Math.random() * 100}%; top: {Math.random() * 100}%; --size: {Math.random() * 5 + 2}px; --delay: {Math.random() * 10}s; --blink: {Math.random()};"></span>
-      {/each}
-    </div>
 
-    {#each Array(6) as _, i}
-      <div class="shooting-star" style="animation-delay: {i * 0.7}s; left: {Math.random() * 100}%; top: {Math.random() * 100}%;"></div>
+    {#each Array(2) as _, i}
+      <div class="shooting-star" style="animation-delay: {i * 2}s; left: {Math.random() * 100}%; top: {Math.random() * 100}%;"></div>
     {/each}
 
-    <!-- aurora ribbon and subtle lens flare -->
+    <!-- aurora ribbon and subtle lens flare - simplified -->
     <div class="aurora" aria-hidden="true"></div>
-    <div class="lens-flare" aria-hidden="true"></div>
 
-    <div class="noise" aria-hidden="true"></div>
-    <!-- animated gradient overlay for subtle shifting colors -->
+    <!-- animated gradient overlay for subtle shifting colors - reduced frequency -->
     <div class="animated-gradient" aria-hidden="true"></div>
   </div>
 
@@ -390,7 +366,7 @@
     filter: blur(0.6px) contrast(120%);
     z-index: 2;
     transform: translateZ(0);
-    animation: starDriftSlow 140s linear infinite;
+    /* Removed animation for better performance */
   }
 
   .star-layer-2 {
@@ -399,19 +375,10 @@
     opacity: 0.65;
     filter: blur(1.2px) contrast(105%);
     z-index: 3;
-    animation: starDrift 100s linear infinite reverse;
+    /* Removed animation for better performance */
   }
 
-  .star-layer-3 {
-    background-image: radial-gradient(circle, rgba(200,220,255,0.6) 1px, transparent 1.4px);
-    background-size: 1200px 1200px;
-    opacity: 0.45;
-    filter: blur(2px) contrast(100%);
-    z-index: 4;
-    animation: starDriftSlower 220s linear infinite;
-  }
-
-  /* Individual star elements (various sizes and blinking) */
+  /* Individual star elements (various sizes and blinking) - reduced frequency */
   .star {
     position: absolute;
     display: block;
@@ -422,14 +389,13 @@
     opacity: calc(0.6 + var(--blink) * 0.6);
     filter: drop-shadow(0 0 calc(var(--size) * 1.6) rgba(255,255,255,0.6));
     transform: translateZ(0);
-    animation: starBlink 3s linear infinite;
+    animation: starBlink 6s linear infinite; /* Reduced frequency */
     will-change: opacity, transform;
   }
 
   /* Layer-specific subtle motion and timing tweaks */
-  .star-layer-1 .star { z-index: 6; animation-duration: calc(2.8s + var(--delay)); }
-  .star-layer-2 .star { z-index: 7; animation-duration: calc(3.6s + var(--delay)); }
-  .star-layer-3 .star { z-index: 8; animation-duration: calc(4.2s + var(--delay)); }
+  .star-layer-1 .star { z-index: 6; animation-duration: calc(4s + var(--delay)); } /* Slower */
+  .star-layer-2 .star { z-index: 7; animation-duration: calc(5s + var(--delay)); } /* Slower */
 
   @keyframes starBlink {
     0% { opacity: 0.2; transform: scale(0.9); }
@@ -438,18 +404,17 @@
     100% { opacity: 0.2; transform: scale(0.95); }
   }
 
-  /* Colorful nebula layers with blending and slow motion */
+  /* Simplified nebula layers - reduced blur for better performance */
   .cosmic-background::after {
     content: '';
     position: absolute;
     inset: -16% -28% -16% -28%;
     background:
-      radial-gradient(44% 36% at 12% 22%, rgba(110,60,180,0.42) 0%, transparent 38%),
-      radial-gradient(54% 44% at 82% 8%, rgba(240,70,170,0.36) 0%, transparent 44%),
-      radial-gradient(66% 56% at 46% 64%, rgba(40,160,220,0.24) 0%, transparent 52%);
-    filter: blur(38px) saturate(165%) contrast(110%);
-    opacity: 0.98;
-    animation: nebulaMove 44s ease-in-out infinite alternate;
+      radial-gradient(44% 36% at 12% 22%, rgba(110,60,180,0.25) 0%, transparent 38%),
+      radial-gradient(54% 44% at 82% 8%, rgba(240,70,170,0.2) 0%, transparent 44%),
+      radial-gradient(66% 56% at 46% 64%, rgba(40,160,220,0.15) 0%, transparent 52%);
+    filter: blur(12px) saturate(120%) contrast(105%);
+    opacity: 0.6;
     mix-blend-mode: screen;
     z-index: 5;
     pointer-events: none;
@@ -476,14 +441,14 @@
     z-index: 55;
   }
 
-  /* Shooting stars: longer, blurred trails with glow */
+  /* Shooting stars: simplified for performance */
   .shooting-star {
     position: absolute;
-    width: 3px;
-    height: 3px;
-    background: radial-gradient(circle, #fff 0%, rgba(255,255,255,0.9) 30%, rgba(255,255,255,0.45) 60%, transparent 100%);
+    width: 2px;
+    height: 2px;
+    background: radial-gradient(circle, #fff 0%, rgba(255,255,255,0.8) 40%, rgba(255,255,255,0.3) 70%, transparent 100%);
     border-radius: 50%;
-    filter: drop-shadow(0 0 6px rgba(255,255,255,0.7));
+    /* Removed drop-shadow for better performance */
     animation: shoot 4.6s cubic-bezier(.25,.8,.2,1) infinite;
     z-index: 45;
     transform-origin: center;
@@ -504,7 +469,7 @@
     pointer-events: none;
   }
 
-  /* Animated gradient overlay for slow color shifts */
+  /* Animated gradient overlay for slow color shifts - simplified */
   .animated-gradient {
     position: absolute;
     inset: 0;
@@ -514,7 +479,7 @@
     opacity: 0.18;
     background: linear-gradient(120deg, rgba(30,40,80,0.0) 0%, rgba(180,50,140,0.08) 35%, rgba(40,120,200,0.06) 65%, rgba(10,10,30,0.0) 100%);
     filter: blur(20px) saturate(120%);
-    animation: gradientShift 24s ease-in-out infinite;
+    /* Removed animation for better performance */
   }
 
   @keyframes gradientShift {
@@ -523,20 +488,20 @@
     100% { transform: translateY(0) scale(1); opacity: 0.16; }
   }
 
-  /* Aurora ribbon (slow, subtle) */
+  /* Aurora ribbon (static for better performance) */
   .aurora {
     position: absolute;
     left: -20%;
     right: -20%;
     top: 60%;
     height: 28vh;
-    background: linear-gradient(90deg, rgba(50,120,255,0.06), rgba(170,60,220,0.12), rgba(255,100,160,0.06));
-    filter: blur(30px) saturate(140%);
+    background: linear-gradient(90deg, rgba(50,120,255,0.04), rgba(170,60,220,0.08), rgba(255,100,160,0.04));
+    filter: blur(20px) saturate(130%);
     transform: skewY(-6deg) translateY(6vh);
-    opacity: 0.75;
+    opacity: 0.5;
     z-index: 22;
     mix-blend-mode: screen;
-    animation: auroraMove 26s ease-in-out infinite alternate;
+    /* Removed animation for better performance */
     pointer-events: none;
   }
 
@@ -701,7 +666,7 @@
       0 0 40px #ff9800,
       0 0 60px #ff5722,
       0 0 80px rgba(255, 235, 59, 0.3);
-    animation: sunGlow 2s ease-in-out infinite alternate;
+    /* Removed animation for better performance */
   }
 
   .sun-corona {
@@ -712,7 +677,7 @@
     height: 100px;
     background: radial-gradient(circle, rgba(255, 235, 59, 0.2) 0%, rgba(255, 152, 0, 0.1) 50%, transparent 100%);
     border-radius: 50%;
-    animation: coronaPulse 3s ease-in-out infinite;
+    /* Removed animation for better performance */
   }
 
   @keyframes orbit {
