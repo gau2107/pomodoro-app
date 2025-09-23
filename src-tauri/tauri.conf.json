@@ -33,6 +33,16 @@
         "center": true,
         "visible": false,
         "create": false
+      },
+      {
+        "label": "session-logs",
+        "title": "Session Logs",
+        "url": "session-logs.html",
+        "fullscreen": true,
+        "resizable": true,
+        "center": true,
+        "visible": false,
+        "create": false
       }
     ],
     "security": {

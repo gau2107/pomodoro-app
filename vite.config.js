@@ -9,7 +9,8 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
-        spaceExplorer: resolve(__dirname, 'space-explorer.html')
+        spaceExplorer: resolve(__dirname, 'space-explorer.html'),
+        sessionLogs: resolve(__dirname, 'session-logs.html')
       }
     }
   }

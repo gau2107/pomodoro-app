@@ -4,6 +4,12 @@
   import soundManager from './lib/utils/sounds.js';
   import SpaceRewards from './lib/rewards/SpaceRewards.svelte';
   import { isTauri } from './lib/tauriApi.js';
+  import { 
+    startSession, 
+    completeSession, 
+    loadSessionStats,
+    sessionStats
+  } from './lib/stores/sessionStore.js';
   
   // For Tauri window management
   let appWindow;
@@ -24,6 +30,14 @@
       console.error("Failed to initialize Tauri Window:", error);
       console.log("Continuing without window controls - this is normal in web environment");
     }
+    
+    // Request notification permission
+    if ("Notification" in window && Notification.permission !== 'granted') {
+      Notification.requestPermission();
+    }
+    
+    // Load existing session stats
+    await loadSessionStats();
   });
   
   // Window control functions (removed - using native controls)
@@ -43,6 +57,7 @@
   let pomodorosCompleted = 0;
   let timerRef;
   let currentSessionProgress = 100; // 100% at start, 0% at end
+  let currentSession = null; // Track current session for logging
   
   // Get current mode label
   $: modeLabel = currentMode === POMODORO 
@@ -52,8 +67,58 @@
   // Space reward system
   let showSpaceRewards = false;
   
+  // Open session logs in a new window
+  async function openSessionLogs() {
+    soundManager.play('click');
+    
+    try {
+      if (isTauri()) {
+        const { WebviewWindow } = await import('@tauri-apps/api/webviewWindow');
+        
+        // Try to get existing window first
+        try {
+          const existingWindow = await WebviewWindow.getByLabel('session-logs');
+          if (existingWindow) {
+            await existingWindow.show();
+            await existingWindow.setFocus();
+            console.log('Session Logs window shown');
+            return;
+          }
+        } catch (e) {
+          console.log('No existing window found, creating new one');
+        }
+        
+        // Create new window
+        const webview = new WebviewWindow('session-logs', {
+          url: 'session-logs.html',
+          title: 'Session Logs',
+          fullscreen: true,
+          resizable: true,
+          center: true,
+          decorations: true,
+          visible: true
+        });
+        
+        console.log('Session Logs window created');
+      } else {
+        console.log('Tauri not available, session logs requires desktop app');
+        alert('Session logs feature requires the desktop app');
+      }
+    } catch (error) {
+      console.error('Failed to open Session Logs window:', error);
+      alert('Failed to open session logs');
+    }
+  }
+  
   // Skip to next timer
   function skipTimer() {
+    // Complete current session as incomplete if one is active
+    if (currentSession) {
+      const timeElapsed = DURATIONS[currentMode] - (timerRef?.timeRemaining || 0);
+      completeSession(false, timeElapsed);
+      currentSession = null;
+    }
+    
     if (currentMode === POMODORO) {
       switchMode(SHORT_BREAK);
     } else {
@@ -121,6 +186,14 @@
   // Switch between timer modes
   function switchMode(mode) {
     soundManager.play('click');
+    
+    // Complete current session if one is active
+    if (currentSession) {
+      const timeElapsed = DURATIONS[currentMode] - timerRef?.timeRemaining || 0;
+      completeSession(false, timeElapsed);
+      currentSession = null;
+    }
+    
     currentMode = mode;
     
     // Reset session progress when switching modes
@@ -133,7 +206,13 @@
   }
   
   // Handle timer completion
-  function handleTimerComplete() {
+  async function handleTimerComplete() {
+    // Complete current session
+    if (currentSession) {
+      await completeSession(true);
+      currentSession = null;
+    }
+    
     // Increment pomodoro count if a focus session was completed
     if (currentMode === POMODORO) {
       pomodorosCompleted++;
@@ -166,6 +245,9 @@
       });
     }
     
+    // Refresh session stats
+    await loadSessionStats();
+    
     // Move to next timer
     skipTimer();
   }
@@ -173,6 +255,34 @@
   // Handle button clicks
   function handleButtonClick() {
     soundManager.play('click');
+  }
+  
+  // Handle timer start
+  function handleTimerStart() {
+    // Start tracking session
+    const sessionType = currentMode === POMODORO ? 'focus' : 
+                       currentMode === SHORT_BREAK ? 'short_break' : 'long_break';
+    const durationMinutes = DURATIONS[currentMode] / 60;
+    
+    currentSession = startSession(sessionType, durationMinutes);
+    console.log('Started session tracking:', currentSession);
+  }
+  
+  // Handle timer pause
+  function handleTimerPause() {
+    // Session tracking continues - we'll save actual time on completion
+    console.log('Timer paused, session tracking continues');
+  }
+  
+  // Handle timer reset
+  function handleTimerReset() {
+    // Complete current session as incomplete if one was active
+    if (currentSession) {
+      const timeElapsed = DURATIONS[currentMode] - (timerRef?.timeRemaining || DURATIONS[currentMode]);
+      completeSession(false, timeElapsed);
+      currentSession = null;
+      console.log('Session reset and saved as incomplete');
+    }
   }
   
   // Handle timer progress updates
@@ -209,13 +319,6 @@
   // Tauri window controls
   // We'll use the window controls from our component
   // which handles the Tauri API calls internally
-  
-  // Request notification permission on mount
-  onMount(() => {
-    if ("Notification" in window && Notification.permission !== 'granted') {
-      Notification.requestPermission();
-    }
-  });
 </script>
 
 <main>
@@ -238,7 +341,10 @@
       duration={DURATIONS[currentMode]}
       label={modeLabel}
       on:complete={handleTimerComplete}
-      on:progress={handleTimerProgress}>
+      on:progress={handleTimerProgress}
+      on:start={handleTimerStart}
+      on:pause={handleTimerPause}
+      on:reset={handleTimerReset}>
       
       <div class="controls">
         {#if timerRef?.isRunning}
@@ -274,11 +380,16 @@
     </PomodoroTimer>
     
     <div class="settings">
-      <span>Focus sessions: {pomodorosCompleted}</span>
-      <span class="time-worked">{Math.floor(pomodorosCompleted * 45 / 60)} hrs {pomodorosCompleted * 45 % 60} mins of focused work</span>
-      <button class="rewards-toggle" on:click={openSpaceExplorer}>
-        Open Space Explorer
-      </button>
+      <span>Focus sessions: {$sessionStats.completed_sessions || pomodorosCompleted}</span>
+      <span class="time-worked">{Math.floor(($sessionStats.total_focus_time_minutes || pomodorosCompleted * 45) / 60)} hrs {($sessionStats.total_focus_time_minutes || pomodorosCompleted * 45) % 60} mins of focused work</span>
+      <div class="action-buttons">
+        <button class="rewards-toggle" on:click={openSpaceExplorer}>
+          🚀 Space Explorer
+        </button>
+        <button class="logs-toggle" on:click={openSessionLogs}>
+          📊 Session Logs
+        </button>
+      </div>
     </div>
     
     <!-- Space Explorer Reward System -->
@@ -318,8 +429,16 @@
     gap: 5px;
   }
   
-  .rewards-toggle {
+  .action-buttons {
+    display: flex;
+    gap: 8px;
     margin-top: 12px;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  
+  .rewards-toggle,
+  .logs-toggle {
     padding: 6px 12px;
     border-radius: 16px;
     background-color: rgba(10, 10, 25, 0.7);
@@ -328,11 +447,23 @@
     font-size: 0.8rem;
     cursor: pointer;
     transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
   }
   
-  .rewards-toggle:hover {
+  .rewards-toggle:hover,
+  .logs-toggle:hover {
     background-color: rgba(20, 20, 50, 0.9);
     transform: translateY(-1px);
+  }
+  
+  .logs-toggle {
+    background-color: rgba(25, 25, 45, 0.7);
+  }
+  
+  .logs-toggle:hover {
+    background-color: rgba(35, 35, 65, 0.9);
   }
   
   .controls {
